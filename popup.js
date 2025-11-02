@@ -1,10 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // --- DOM Elements ---
   const globalToggle = document.getElementById('global-toggle');
   const presetListDiv = document.getElementById('preset-list');
   const addNewButton = document.getElementById('add-new');
 
   /**
-   * Loads all settings from storage and renders the UI elements (toggle state, preset list).
+   * Loads all settings from storage and renders the UI elements.
    */
   function loadAndRender() {
     chrome.storage.sync.get({
@@ -13,9 +14,13 @@ document.addEventListener('DOMContentLoaded', () => {
       presets: []
     }, (settings) => {
       // 1. Set the global toggle state
-      globalToggle.checked = settings.isGloballyEnabled;
+      if (globalToggle) {
+          globalToggle.checked = settings.isGloballyEnabled;
+      }
 
       // 2. Clear and render the preset list
+      if (!presetListDiv) return; // Exit if the div isn't found
+
       presetListDiv.innerHTML = ''; // Clear old list
 
       if (settings.presets.length === 0) {
@@ -45,10 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Edit Button ---
         const editButton = document.createElement('button');
-        editButton.textContent = '✏️'; // Pencil icon
+        editButton.textContent = 'Edit'; // Pencil icon
         editButton.title = 'Edit Preset';
         editButton.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent the item from being selected when clicking edit
+          e.stopPropagation(); // Prevents setting this preset as active
           // Use local storage to pass the ID to the options page
           chrome.storage.local.set({ editPresetId: preset.id }, () => {
              chrome.runtime.openOptionsPage();
@@ -57,11 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // --- Delete Button ---
         const deleteButton = document.createElement('button');
-        deleteButton.textContent = '❌'; // Delete icon
+        deleteButton.textContent = 'Delete'; // Delete icon
         deleteButton.title = 'Delete Preset';
-        deleteButton.classList.add('delete-button'); // For dark theme styling
+        deleteButton.classList.add('delete-button'); 
         deleteButton.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevent the item from being selected when clicking delete
+          e.stopPropagation(); // Prevents setting this preset as active
           deletePreset(preset.id);
         });
 
@@ -78,37 +83,31 @@ document.addEventListener('DOMContentLoaded', () => {
   //           EVENT HANDLERS
   // ===================================
 
-  // Save global toggle state when it changes
-  globalToggle.addEventListener('change', () => {
-    chrome.storage.sync.set({ isGloballyEnabled: globalToggle.checked });
-  });
-
-  // Open options page to add a new preset (New Mode)
-  addNewButton.addEventListener('click', () => {
-    // Clear any existing 'editPresetId' flag to force New Mode in options.js
-    chrome.storage.local.set({ editPresetId: null }, () => {
-      chrome.runtime.openOptionsPage();
+  if (globalToggle) {
+    globalToggle.addEventListener('change', () => {
+      chrome.storage.sync.set({ isGloballyEnabled: globalToggle.checked });
     });
-  });
+  }
+
+  if (addNewButton) {
+    addNewButton.addEventListener('click', () => {
+      // Clear any existing 'editPresetId' flag to force New Mode
+      chrome.storage.local.set({ editPresetId: null }, () => {
+        chrome.runtime.openOptionsPage();
+      });
+    });
+  }
 
   // ===================================
   //           DATA FUNCTIONS
   // ===================================
 
-  /**
-   * Sets the specified preset as active and re-renders the list.
-   * @param {string} presetId - The ID of the preset to activate.
-   */
   function setActivePreset(presetId) {
     chrome.storage.sync.set({ activePresetId: presetId }, () => {
-      loadAndRender(); // Re-render to show active state highlight
+      loadAndRender(); 
     });
   }
 
-  /**
-   * Deletes a preset by ID and handles resetting the active ID if needed.
-   * @param {string} presetId - The ID of the preset to delete.
-   */
   function deletePreset(presetId) {
     if (!confirm('Are you sure you want to delete this preset?')) {
       return;
@@ -119,11 +118,12 @@ document.addEventListener('DOMContentLoaded', () => {
       
       // If we deleted the currently active preset, clear the active ID
       if (settings.activePresetId === presetId) {
-        newActiveId = (newPresets.length > 0) ? newPresets[0].id : null; // Optionally set first preset as new active
+        // Fallback: If any presets remain, set the first one as active
+        newActiveId = (newPresets.length > 0) ? newPresets[0].id : null; 
       }
       
       chrome.storage.sync.set({ presets: newPresets, activePresetId: newActiveId }, () => {
-        loadAndRender(); // Re-render the list to reflect deletion
+        loadAndRender(); 
       });
     });
   }
@@ -132,16 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
   //           INITIALIZATION
   // ===================================
   
-  // Load UI on panel open
   loadAndRender();
 
-  // Listen for storage changes from the options page (editor) to update the list immediately
+  // Re-render the popup when settings change in the options page
   chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync') {
-      // Check if presets changed, which indicates a save/delete event occurred
-      if (changes.presets || changes.activePresetId) {
-        loadAndRender();
-      }
+    if (namespace === 'sync' && (changes.presets || changes.activePresetId)) {
+      loadAndRender();
     }
   });
 });

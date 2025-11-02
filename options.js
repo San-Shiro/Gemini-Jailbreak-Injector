@@ -5,7 +5,8 @@ let currentPresetId = null;
  */
 function save_options() {
   const name = document.getElementById('name').value.trim();
-  const prefix = document.getElementById('prefix').value;
+  // We read the .value property of the textarea, which preserves all newlines and spaces.
+  const prefix = document.getElementById('prefix').value; 
   const suffix = document.getElementById('suffix').value;
 
   if (!name) {
@@ -22,13 +23,14 @@ function save_options() {
       // Find and update the existing preset
       const presetIndex = presets.findIndex(p => p.id === currentPresetId);
       if (presetIndex > -1) {
-        presets[presetIndex] = { ...presets[presetIndex], name, prefix, suffix };
+        // Update the existing preset object
+        presets[presetIndex] = { ...presets[presetIndex], name, prefix, suffix }; 
       }
     } else {
       // --- NEW MODE ---
       // Add a new preset
       const newPreset = {
-        id: `preset-${Date.now()}`, // Simple unique ID
+        id: `preset-${Date.now()}`, // Generate a simple unique ID
         name: name,
         prefix: prefix,
         suffix: suffix
@@ -41,13 +43,13 @@ function save_options() {
       }
     }
 
-    // Save the entire presets array and potentially the new active ID back
+    // Save the entire collection back to sync storage
     chrome.storage.sync.set({ presets: presets, activePresetId: newActiveId }, () => {
       const status = document.getElementById('status');
       status.textContent = 'Preset saved.';
-      status.style.opacity = '1'; // Make status visible
+      status.style.opacity = '1'; // Show status message
       
-      // Close the options page after saving
+      // Close the options page after a brief delay
       setTimeout(() => {
         status.style.opacity = '0'; 
         window.close();
@@ -57,11 +59,10 @@ function save_options() {
 }
 
 /**
- * Restores form state based on whether we are editing an existing preset
- * or creating a new one.
+ * Restores form state based on the 'editPresetId' flag passed from the popup.
  */
 function restore_options() {
-  // Check local storage for the edit flag passed from the popup
+  // Check local storage for the edit flag
   chrome.storage.local.get('editPresetId', (data) => {
     if (data.editPresetId) {
       currentPresetId = data.editPresetId;
@@ -86,5 +87,6 @@ function restore_options() {
   });
 }
 
+// Ensure the page setup function runs when the HTML document is fully loaded
 document.addEventListener('DOMContentLoaded', restore_options);
 document.getElementById('save').addEventListener('click', save_options);

@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Gemini Injector</title>
+  <title>Gemini Preset Injector</title>
   <style>
     /* VARIABLES */
     :root {
       --bg-dark: #1e1e1e;
       --bg-medium: #2d2d2d;
+      --bg-header: #1e1e1e; /* Match main background */
       --text-light: #ffffff;
-      --accent-blue: #0078d7; /* Modern Microsoft Blue */
-      --active-bg: #0078d720; /* Light blue tint for active item */
+      --text-dim: #bbbbbb;
+      --accent-blue: #0078d7;
+      --active-bg: #0078d720;
       --border-color: #3e3e3e;
       --danger-red: #ff4545;
     }
@@ -17,16 +19,48 @@
     /* GENERAL STYLES */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      width: 380px; /* Slightly wider panel */
-      padding: 15px;
+      width: 350px;
+      padding: 0; 
       background-color: var(--bg-dark);
       color: var(--text-light);
     }
+    
+    /* ---- MODIFIED HEADER PANEL ---- */
+    .header {
+      background-color: var(--bg-header);
+      padding: 10px 15px; /* Reduced padding */
+      margin-bottom: 10px; /* Reduced margin */
+      /* Removed border-bottom */
+    }
+    .header h2 {
+      margin: 0;
+      font-size: 1.0em; /* Reduced font size */
+      color: var(--text-light);
+      font-weight: 500; /* Thinner font */
+    }
+    .header span {
+      font-size: 0.75em; /* Reduced font size */
+      color: var(--text-dim);
+    }
+    /* ---- END MODIFIED HEADER ---- */
+    
+    /* Main content wrapper for padding */
+    .content-wrapper {
+      padding: 0 15px 15px 15px; 
+    }
+
     h3, h4 {
       color: var(--text-light);
+      font-weight: 500;
+      font-size: 1em;
+    }
+    h3 {
+      margin: 0;
+      padding-left: 10px;
+    }
+    h4 {
       margin-top: 5px;
       margin-bottom: 10px;
-      font-weight: 500;
     }
     hr {
       border: none;
@@ -40,13 +74,13 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
-      padding: 5px;
+      padding: 10px 0;
       border-radius: 4px;
       background-color: var(--bg-medium);
     }
 
-    /* TOGGLE SWITCH CSS (Improved Dark Theme) */
-    .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+    /* TOGGLE SWITCH CSS */
+    .switch { position: relative; display: inline-block; width: 50px; height: 24px; margin-right: 10px; }
     .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
       position: absolute;
@@ -89,12 +123,12 @@
       border-bottom: none;
     }
     .preset-item:hover:not(.active) {
-      background-color: var(--bg-medium); /* Darken slightly on hover */
+      background-color: #383838;
       cursor: pointer;
     }
     .preset-item.active {
       background-color: var(--active-bg);
-      border-left: 4px solid var(--accent-blue); /* Highlight the active item */
+      border-left: 4px solid var(--accent-blue);
       padding-left: 6px;
     }
     .preset-name {
@@ -104,8 +138,8 @@
       color: var(--text-light);
     }
     .preset-actions button {
-      font-size: 14px;
-      padding: 5px 8px;
+      font-size: 12px;
+      padding: 4px 8px;
       margin-left: 5px;
       cursor: pointer;
       background-color: transparent;
@@ -120,6 +154,7 @@
     .preset-actions .delete-button:hover {
         background-color: var(--danger-red);
         border-color: var(--danger-red);
+        color: white;
     }
 
     /* ADD NEW BUTTON */
@@ -136,8 +171,32 @@
       transition: background-color 0.2s;
     }
     #add-new:hover {
-      background-color: #005a9e; /* Darker blue on hover */
+      background-color: #005a9e;
     }
   </style>
 </head>
 <body>
+
+  <div class="header">
+    <h2>Gemini Preset Injector</h2>
+    <span>Version 1.1</span>
+  </div>
+
+  <div class="content-wrapper">
+    <div class="setting-row">
+      <h3>Global Injection Toggle</h3>
+      <label class="switch">
+        <input type="checkbox" id="global-toggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <hr>
+    <h4>Active Presets</h4>
+    <div id="preset-list">
+      </div>
+    <button id="add-new">Add New Preset</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
