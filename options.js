@@ -1,11 +1,7 @@
 let currentPresetId = null;
 
-/**
- * Saves or updates a preset to chrome.storage.sync.
- */
 function save_options() {
   const name = document.getElementById('name').value.trim();
-  // We read the .value property of the textarea, which preserves all newlines and spaces.
   const prefix = document.getElementById('prefix').value; 
   const suffix = document.getElementById('suffix').value;
 
@@ -14,42 +10,44 @@ function save_options() {
     return;
   }
 
-  chrome.storage.sync.get({ presets: [], activePresetId: null }, (data) => {
+  // USE .local FOR 5MB LIMIT
+  chrome.storage.local.get({ presets: [], activePresetId: null }, (data) => {
     const presets = data.presets;
     let newActiveId = data.activePresetId;
     
     if (currentPresetId) {
       // --- EDIT MODE ---
-      // Find and update the existing preset
       const presetIndex = presets.findIndex(p => p.id === currentPresetId);
       if (presetIndex > -1) {
-        // Update the existing preset object
         presets[presetIndex] = { ...presets[presetIndex], name, prefix, suffix }; 
       }
     } else {
       // --- NEW MODE ---
-      // Add a new preset
       const newPreset = {
-        id: `preset-${Date.now()}`, // Generate a simple unique ID
+        id: `preset-${Date.now()}`,
         name: name,
         prefix: prefix,
         suffix: suffix
       };
       presets.push(newPreset);
-      
-      // If no preset was active before, make the newly created one active
       if (!newActiveId) {
         newActiveId = newPreset.id;
       }
     }
 
-    // Save the entire collection back to sync storage
-    chrome.storage.sync.set({ presets: presets, activePresetId: newActiveId }, () => {
+    // USE .local FOR 5MB LIMIT
+    // Also, add an error check here for quota failures
+    chrome.storage.local.set({ presets: presets, activePresetId: newActiveId }, () => {
+      if (chrome.runtime.lastError) {
+        // If it fails (e.g., we *still* hit the 5MB limit), tell the user.
+        alert(`Error saving preset: ${chrome.runtime.lastError.message}. The text might be too large.`);
+        return;
+      }
+
       const status = document.getElementById('status');
       status.textContent = 'Preset saved.';
-      status.style.opacity = '1'; // Show status message
+      status.style.opacity = '1';
       
-      // Close the options page after a brief delay
       setTimeout(() => {
         status.style.opacity = '0'; 
         window.close();
@@ -58,18 +56,15 @@ function save_options() {
   });
 }
 
-/**
- * Restores form state based on the 'editPresetId' flag passed from the popup.
- */
 function restore_options() {
-  // Check local storage for the edit flag
+  // This file is already using .local, which is correct.
   chrome.storage.local.get('editPresetId', (data) => {
     if (data.editPresetId) {
       currentPresetId = data.editPresetId;
       document.getElementById('page-title').textContent = 'Edit Preset';
 
-      // Load the preset's data from sync storage
-      chrome.storage.sync.get({ presets: [] }, (syncData) => {
+      // USE .local FOR 5MB LIMIT
+      chrome.storage.local.get({ presets: [] }, (syncData) => {
         const preset = syncData.presets.find(p => p.id === currentPresetId);
         if (preset) {
           document.getElementById('name').value = preset.name;
@@ -78,15 +73,12 @@ function restore_options() {
         }
       });
       
-      // Clear the local 'edit' flag right after reading it
       chrome.storage.local.remove('editPresetId');
     } else {
-      // New Mode: Ensure title is correct
       document.getElementById('page-title').textContent = 'Create New Preset';
     }
   });
 }
 
-// Ensure the page setup function runs when the HTML document is fully loaded
 document.addEventListener('DOMContentLoaded', restore_options);
 document.getElementById('save').addEventListener('click', save_options);

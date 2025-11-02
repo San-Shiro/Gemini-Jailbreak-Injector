@@ -5,10 +5,28 @@ document.addEventListener('DOMContentLoaded', () => {
   const addNewButton = document.getElementById('add-new');
 
   /**
+   * NEW FUNCTION: Updates the extension icon based on the enabled state.
+   * @param {boolean} isEnabled - The current state of the toggle.
+   */
+  function updateIcon(isEnabled) {
+    const iconPaths = {
+      "16": isEnabled ? "icon16.png" : "icon16-disabled.png",
+      "48": isEnabled ? "icon48.png" : "icon48-disabled.png",
+      "128": isEnabled ? "icon128.png" : "icon128-disabled.png"
+    };
+
+    chrome.action.setIcon({ path: iconPaths }, () => {
+      if (chrome.runtime.lastError) {
+        console.warn("Could not set icon. Are icon paths correct in manifest.json?", chrome.runtime.lastError.message);
+      }
+    });
+  }
+
+  /**
    * Loads all settings from storage and renders the UI elements.
    */
   function loadAndRender() {
-    chrome.storage.sync.get({
+    chrome.storage.local.get({
       isGloballyEnabled: true,
       activePresetId: null,
       presets: []
@@ -18,10 +36,14 @@ document.addEventListener('DOMContentLoaded', () => {
           globalToggle.checked = settings.isGloballyEnabled;
       }
 
-      // 2. Clear and render the preset list
-      if (!presetListDiv) return; // Exit if the div isn't found
+      // --- NEW ---
+      // Update the icon to match the loaded state
+      updateIcon(settings.isGloballyEnabled);
+      // --- END NEW ---
 
-      presetListDiv.innerHTML = ''; // Clear old list
+      // 2. Clear and render the preset list
+      if (!presetListDiv) return;
+      presetListDiv.innerHTML = ''; 
 
       if (settings.presets.length === 0) {
         presetListDiv.innerHTML = '<div style="padding: 10px; color: #aaa; text-align: center;">No presets found. Click "Add New Preset" to create one.</div>';
@@ -30,46 +52,34 @@ document.addEventListener('DOMContentLoaded', () => {
       settings.presets.forEach(preset => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'preset-item';
-        
-        // Highlight the active preset
         if (preset.id === settings.activePresetId) {
           itemDiv.classList.add('active');
         }
-
         const nameSpan = document.createElement('span');
         nameSpan.className = 'preset-name';
         nameSpan.textContent = preset.name;
-        
-        // Click on the name to set it as the active preset
         nameSpan.addEventListener('click', () => {
           setActivePreset(preset.id);
         });
-
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'preset-actions';
-
-        // --- Edit Button ---
         const editButton = document.createElement('button');
-        editButton.textContent = 'Edit'; // Pencil icon
+        editButton.textContent = 'Edit';
         editButton.title = 'Edit Preset';
         editButton.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevents setting this preset as active
-          // Use local storage to pass the ID to the options page
+          e.stopPropagation();
           chrome.storage.local.set({ editPresetId: preset.id }, () => {
              chrome.runtime.openOptionsPage();
           });
         });
-
-        // --- Delete Button ---
         const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete'; // Delete icon
+        deleteButton.textContent = 'Delete';
         deleteButton.title = 'Delete Preset';
         deleteButton.classList.add('delete-button'); 
         deleteButton.addEventListener('click', (e) => {
-          e.stopPropagation(); // Prevents setting this preset as active
+          e.stopPropagation();
           deletePreset(preset.id);
         });
-
         actionsDiv.appendChild(editButton);
         actionsDiv.appendChild(deleteButton);
         itemDiv.appendChild(nameSpan);
@@ -85,25 +95,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (globalToggle) {
     globalToggle.addEventListener('change', () => {
-      chrome.storage.sync.set({ isGloballyEnabled: globalToggle.checked });
+      const isEnabled = globalToggle.checked;
+      
+      // 1. Save the new state
+      chrome.storage.local.set({ isGloballyEnabled: isEnabled });
+      
+      // 2. --- NEW --- Update the icon
+      updateIcon(isEnabled);
     });
   }
 
   if (addNewButton) {
     addNewButton.addEventListener('click', () => {
-      // Clear any existing 'editPresetId' flag to force New Mode
       chrome.storage.local.set({ editPresetId: null }, () => {
         chrome.runtime.openOptionsPage();
       });
     });
   }
 
-  // ===================================
-  //           DATA FUNCTIONS
-  // ===================================
+  // ... (rest of the file, no changes to setActivePreset or deletePreset) ...
 
   function setActivePreset(presetId) {
-    chrome.storage.sync.set({ activePresetId: presetId }, () => {
+    chrome.storage.local.set({ activePresetId: presetId }, () => {
       loadAndRender(); 
     });
   }
@@ -112,18 +125,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!confirm('Are you sure you want to delete this preset?')) {
       return;
     }
-    chrome.storage.sync.get({ presets: [], activePresetId: null }, (settings) => {
+    chrome.storage.local.get({ presets: [], activePresetId: null }, (settings) => {
       const newPresets = settings.presets.filter(p => p.id !== presetId);
       let newActiveId = settings.activePresetId;
-      
-      // If we deleted the currently active preset, clear the active ID
       if (settings.activePresetId === presetId) {
-        // Fallback: If any presets remain, set the first one as active
         newActiveId = (newPresets.length > 0) ? newPresets[0].id : null; 
       }
       
-      chrome.storage.sync.set({ presets: newPresets, activePresetId: newActiveId }, () => {
-        loadAndRender(); 
+      chrome.storage.local.set({ presets: newPresets, activePresetId: newActiveId }, () => {
+        if (chrome.runtime.lastError) {
+          console.error('Error deleting preset:', chrome.runtime.lastError.message);
+        } else {
+          loadAndRender(); 
+        }
       });
     });
   }
@@ -134,10 +148,19 @@ document.addEventListener('DOMContentLoaded', () => {
   
   loadAndRender();
 
-  // Re-render the popup when settings change in the options page
-  chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync' && (changes.presets || changes.activePresetId)) {
+  // Re-render the popup when settings change
+  chrome.storage.local.onChanged.addListener((changes) => {
+    if (changes.presets || changes.activePresetId) {
       loadAndRender();
+    }
+    // --- NEW ---
+    // Also check if the toggle was changed from another context
+    if (changes.isGloballyEnabled) {
+      const newState = changes.isGloballyEnabled.newValue;
+      if (globalToggle) {
+        globalToggle.checked = newState;
+      }
+      updateIcon(newState);
     }
   });
 });
